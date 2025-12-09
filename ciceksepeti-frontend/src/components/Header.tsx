@@ -48,10 +48,10 @@ const Header = () => {
         <div className="flex items-center gap-2 lg:gap-6 flex-shrink-0">
           
           {/* Sipariş Takip */}
-          <button className="hidden lg:flex items-center gap-2 text-sm font-medium hover:text-rose-600 transition-colors">
-            <Clock size={20} />
-            <span>Sipariş Takip</span>
-          </button>
+         <button 
+          onClick={() => navigate('/track')} className="hidden lg:flex items-center gap-2 text-sm font-medium hover:text-rose-600 transition-colors">
+          <Clock size={20} />
+          <span>Sipariş Takip</span></button>
 
           {/* Üyelik Dropdown */}
           <div className="relative group py-4">
@@ -69,7 +69,8 @@ const Header = () => {
                  >
                    Giriş Yap
                  </button>
-                 <button className="text-left px-4 py-2 hover:bg-rose-50 hover:text-rose-600 rounded-md text-sm font-medium">Üye Ol</button>
+                 <button onClick={() => navigate('/register')}  // 👈 BU SATIRI EKLE
+                  className="text-left px-4 py-2 hover:bg-rose-50 hover:text-rose-600 rounded-md text-sm font-medium">Üye Ol</button>
                  <hr className="my-1 border-gray-100"/>
                  <button className="text-left px-4 py-2 hover:bg-rose-50 hover:text-rose-600 rounded-md text-sm">Kurumsal Giriş</button>
                </div>

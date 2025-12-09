@@ -1,3 +1,5 @@
+import Register from './pages/Register';
+import OrderTracking from './pages/OrderTracking';
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
@@ -24,6 +26,8 @@ function App() {
             
             {/* Ürün Listeleme & Arama Sonuçları Sayfası */}
             <Route path="/products" element={<ProductListing />} />
+            <Route path="/track" element={<OrderTracking />} />
+            <Route path="/register" element={<Register />} />
           </Routes>
         </main>
 
