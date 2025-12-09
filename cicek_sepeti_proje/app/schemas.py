@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import List, Optional
 
 # --- AUTH SCHEMAS ---
 class Token(BaseModel):
@@ -56,7 +56,7 @@ class ProductCreate(ProductBase):
 
 class ProductOut(ProductBase):
     id: int
-    seller_id: int
+    seller_id: Optional[int] = None
     seller_company_name: Optional[str] = None
     seller_city: Optional[str] = None
     

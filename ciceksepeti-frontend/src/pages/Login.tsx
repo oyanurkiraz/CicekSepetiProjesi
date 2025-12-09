@@ -43,7 +43,7 @@ const Login = () => {
       
       // 4. Anasayfaya Yönlendir
       alert("Giriş Başarılı! Yönlendiriliyorsunuz...");
-      navigate("/");
+      window.location.href = "/";
 
     } catch (err: any) {
       setError(err.message);

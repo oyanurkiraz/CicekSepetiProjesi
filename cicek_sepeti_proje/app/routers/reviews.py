@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from .. import schemas, database, crud, models
-from . import auth
+from .. import models, schemas, database, oauth2
 
 router = APIRouter(
     prefix="/reviews",
@@ -11,24 +10,47 @@ router = APIRouter(
 
 get_db = database.get_db
 
-# 1. Yorum Yap (Sadece Müşteriler)
-@router.post("/{product_id}", response_model=schemas.ReviewOut)
+# 1. BİR ÜRÜNÜN YORUMLARINI GETİR
+@router.get("/", response_model=List[schemas.ReviewOut])
+def get_reviews(product_id: int, db: Session = Depends(get_db)):
+    reviews = db.query(models.Review).filter(models.Review.product_id == product_id).all()
+    return reviews
+
+# 2. YENİ YORUM EKLE (Sadece Satın Alanlar!)
+@router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.ReviewOut)
 def create_review(
-    product_id: int,
-    review: schemas.ReviewCreate,
+    review: schemas.ReviewCreate, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(oauth2.get_current_user) # Giriş yapmış kullanıcı
 ):
-    # Çiçekçi kendi ürününe yorum yapmasın, sadece müşteriler yapsın
-    if current_user.role != "individual":
-        raise HTTPException(status_code=403, detail="Sadece müşteriler yorum yapabilir.")
-
-    # Ürün var mı diye kontrol edilebilir (İsteğe bağlı ama iyi olur)
-    # Şimdilik direkt ekliyoruz.
+    # KURAL: Kullanıcı bu ürünü satın almış mı?
+    # Not: Senin Order modelinde product_id olduğunu varsayıyorum (Basit yapı)
+    # Eğer OrderItem tablosu kullanıyorsan burası değişmeli.
     
-    return crud.create_review(db=db, review=review, user_id=current_user.id, product_id=product_id)
+    has_purchased = db.query(models.Order).filter(
+        models.Order.user_id == current_user.id,
+        models.Order.product_id == review.product_id
+    ).first()
 
-# 2. Bir Ürünün Yorumlarını Gör (HERKES)
-@router.get("/{product_id}", response_model=List[schemas.ReviewOut])
-def read_reviews(product_id: int, db: Session = Depends(get_db)):
-    return crud.get_reviews_by_product(db=db, product_id=product_id)
+    if not has_purchased:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu ürünü satın almadığınız için yorum yapamazsınız."
+        )
+
+    # Daha önce yorum yapmış mı? (Opsiyonel: Her ürüne 1 yorum hakkı)
+    existing_review = db.query(models.Review).filter(
+        models.Review.user_id == current_user.id,
+        models.Review.product_id == review.product_id
+    ).first()
+
+    if existing_review:
+        raise HTTPException(status_code=400, detail="Bu ürün için zaten bir yorumunuz var.")
+
+    # Yorumu Kaydet
+    new_review = models.Review(user_id=current_user.id, **review.dict())
+    db.add(new_review)
+    db.commit()
+    db.refresh(new_review)
+    
+    return new_review

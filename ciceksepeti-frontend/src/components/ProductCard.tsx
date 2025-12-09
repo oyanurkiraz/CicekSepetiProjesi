@@ -1,25 +1,32 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ShoppingCart } from 'lucide-react';
 
-// Gelen verinin tipini tanımlıyoruz
+// Gelen verinin tipi (id eklendi)
 interface ProductCardProps {
+  id: number;
   name: string;
   description: string;
   price: number;
   image_url: string;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ name, description, price, image_url }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ id, name, description, price, image_url }) => {
+  const navigate = useNavigate();
+
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col h-full">
+    <div 
+      onClick={() => navigate(`/product/${id}`)} // Tıklayınca Detay Sayfasına Git
+      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col h-full cursor-pointer group"
+    >
       
       {/* Ürün Resmi */}
       <div className="h-48 w-full relative">
         <img 
           src={image_url} 
           alt={name} 
-          className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500"
-          // Eğer resim yüklenemezse (kırık linkse) varsayılan bir çiçek resmi gösterelim
+          className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
+          // Eğer resim yüklenemezse varsayılan bir çiçek resmi göster
           onError={(e) => {
             (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=1000&auto=format&fit=crop"; 
           }}
@@ -28,7 +35,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ name, description, price, ima
 
       {/* İçerik */}
       <div className="p-5 flex flex-col flex-grow">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">{name}</h3>
+        <h3 className="text-lg font-bold text-gray-800 mb-1 group-hover:text-rose-600 transition-colors">{name}</h3>
         <p className="text-sm text-gray-500 mb-4 line-clamp-2">{description}</p>
         
         {/* Fiyat ve Buton */}
@@ -37,7 +44,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ name, description, price, ima
             {price} ₺
           </span>
           
-          <button className="bg-green-100 text-green-700 p-2 rounded-full hover:bg-green-600 hover:text-white transition-colors">
+          {/* Sepet butonu tıklandığında detay sayfasına gitmesini engellemek için (stopPropagation) */}
+          <button 
+            onClick={(e) => {
+              e.stopPropagation(); 
+              console.log("Sepete eklendi:", name);
+              // İleride buraya sepete ekleme kodu gelecek
+            }}
+            className="bg-green-100 text-green-700 p-2 rounded-full hover:bg-green-600 hover:text-white transition-colors"
+          >
             <ShoppingCart size={20} />
           </button>
         </div>

@@ -1,3 +1,4 @@
+import ProductDetail from './pages/ProductDetail';
 import Register from './pages/Register';
 import OrderTracking from './pages/OrderTracking';
 import React from 'react';
@@ -28,6 +29,7 @@ function App() {
             <Route path="/products" element={<ProductListing />} />
             <Route path="/track" element={<OrderTracking />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/product/:id" element={<ProductDetail />} />
           </Routes>
         </main>
 
