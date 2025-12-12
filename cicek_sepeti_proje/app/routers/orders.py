@@ -1,74 +1,55 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from .. import schemas, database, crud, models
-from . import auth
+from .. import models, schemas, database, oauth2
+import random
+import string
+from datetime import datetime
 
-router = APIRouter(
-    prefix="/orders",
-    tags=["Orders"]
-)
-
+router = APIRouter(prefix="/orders", tags=["Orders"])
 get_db = database.get_db
 
-# 1. Sipariş Ver (SADECE BİREYSEL MÜŞTERİLER)
-@router.post("/", response_model=schemas.OrderOut)
+def generate_tracking_code():
+    return "SP-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+# 1. SİPARİŞ OLUŞTUR
+@router.post("/", status_code=status.HTTP_201_CREATED)
 def create_order(
-    order: schemas.OrderCreate, 
+    order_data: schemas.OrderCreate, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(oauth2.get_current_user)
 ):
-    # Çiçekçi kendi kendine sipariş veremesin :)
-    if current_user.role != "individual":
-        raise HTTPException(status_code=403, detail="Sadece müşteriler sipariş verebilir.")
+    tracking_code = generate_tracking_code()
     
-    return crud.create_order(db=db, order=order, user_id=current_user.id)
+    new_order = models.Order(
+        tracking_number=tracking_code,
+        status="Sipariş Alındı",
+        customer_id=current_user.id,
+        product_id=order_data.product_id,
+        receiver_name=order_data.receiver_name,
+        receiver_phone=order_data.receiver_phone,
+        receiver_address=order_data.receiver_address,
+        card_note=order_data.card_note,
+        delivery_date=order_data.delivery_date,
+        order_date=datetime.utcnow()
+    )
+    
+    db.add(new_order)
+    db.commit()
+    db.refresh(new_order)
+    return {"message": "Sipariş alındı", "tracking_number": tracking_code}
 
-# 2. Siparişlerimi Gör (Müşteri kendi siparişini görür)
+# 2. SİPARİŞLERİMİ GETİR
 @router.get("/", response_model=List[schemas.OrderOut])
-def read_my_orders(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
-):
-    return crud.get_my_orders(db=db, user_id=current_user.id)
+def get_my_orders(db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
+    orders = db.query(models.Order).filter(models.Order.customer_id == current_user.id).all()
+    return orders
 
-# 3. Sipariş Takibi (HERKES ERİŞEBİLİR - GİRİŞ GEREKMEZ)
+# 3. KARGO TAKİP (İŞTE BU EKSİKTİ!) 👇
 @router.get("/track/{tracking_number}", response_model=schemas.OrderOut)
 def track_order(tracking_number: str, db: Session = Depends(get_db)):
-    order = crud.get_order_by_tracking(db, tracking_number=tracking_number)
-    
+    # Takip koduna göre ara
+    order = db.query(models.Order).filter(models.Order.tracking_number == tracking_number).first()
     if not order:
-        raise HTTPException(status_code=404, detail="Sipariş bulunamadı. Lütfen kodu kontrol edin.")
-        
+        raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
     return order
-# 4. Satıcı: Bana Gelen Siparişleri Listele
-@router.get("/incoming", response_model=List[schemas.OrderOut])
-def read_incoming_orders(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
-):
-    # Sadece çiçekçiler görebilir
-    if current_user.role != "corporate":
-        raise HTTPException(status_code=403, detail="Bu sayfayı sadece çiçekçiler görebilir.")
-        
-    return crud.get_orders_for_seller(db=db, seller_id=current_user.id)
-
-# 5. Satıcı: Sipariş Durumunu Güncelle (Örn: Yola Çıktı)
-@router.put("/{order_id}/status", response_model=schemas.OrderOut)
-def update_status(
-    order_id: int, 
-    status: str, # Query parametresi olarak gelecek (Örn: ?status=Yola Çıktı)
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
-):
-    if current_user.role != "corporate":
-        raise HTTPException(status_code=403, detail="Sadece çiçekçiler durum güncelleyebilir.")
-    
-    # Güvenlik için: Satıcı başkasının siparişini güncelleyemesin diye kontrol eklenebilir
-    # Ama şimdilik basit tutuyoruz.
-    
-    updated_order = crud.update_order_status(db=db, order_id=order_id, new_status=status)
-    if not updated_order:
-        raise HTTPException(status_code=404, detail="Sipariş bulunamadı.")
-        
-    return updated_order

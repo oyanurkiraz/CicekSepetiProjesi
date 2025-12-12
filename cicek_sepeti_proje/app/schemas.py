@@ -1,55 +1,43 @@
+from pydantic import BaseModel, EmailStr
+from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel
-from typing import List, Optional
 
-# --- AUTH SCHEMAS ---
+# USER
+class UserBase(BaseModel):
+    email: EmailStr
+
+class UserCreate(UserBase):
+    password: str
+    name: str 
+    phone_number: Optional[str] = None
+    role: str = "individual"
+    company_name: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None      # Şehir Seçimi İçin
+    district: Optional[str] = None  # İlçe Seçimi İçin
+
+class UserOut(UserBase):
+    id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    city: Optional[str] = None
+    district: Optional[str] = None
+    role: str
+    class Config:
+        from_attributes = True
+
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-class TokenData(BaseModel):
-    user_id: Optional[int] = None
-
-# --- USER SCHEMAS ---
-class UserBase(BaseModel):
-    email: str
-    phone: str
-
-class UserCreateIndividual(UserBase):
-    password: str
-    first_name: str
-    last_name: str
-
-class UserCreateCorporate(UserBase):
-    password: str
-    first_name: str # Yetkili adı
-    last_name: str  # Yetkili soyadı
-    company_name: str
-    address: str
-    city: str
-    district: str
-
-class UserLogin(BaseModel):
-    email: str
-    password: str
-
-class UserOut(BaseModel):
-    id: int
-    email: str
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    role: str
-    city: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
-
-# --- PRODUCT SCHEMAS ---
+# PRODUCT
 class ProductBase(BaseModel):
     name: str
     description: str
     price: float
     image_url: str
+    is_active: bool = True
+    category: Optional[str] = None # Kategori Eklendi
 
 class ProductCreate(ProductBase):
     pass
@@ -57,44 +45,51 @@ class ProductCreate(ProductBase):
 class ProductOut(ProductBase):
     id: int
     seller_id: Optional[int] = None
-    seller_company_name: Optional[str] = None
-    seller_city: Optional[str] = None
-    
+    seller: Optional[UserOut] = None # Satıcı bilgisi (Şehri görmek için)
     class Config:
         from_attributes = True
 
-# --- ORDER SCHEMAS ---
+# FAVORITE
+class FavoriteBase(BaseModel):
+    product_id: int
+
+class FavoriteOut(BaseModel):
+    id: int
+    product: ProductOut
+    class Config:
+        from_attributes = True
+
+# ORDER & REVIEW (Aynı kalabilir, yer kaplamasın diye kısalttım ama tam halini koru)
 class OrderCreate(BaseModel):
     product_id: int
-    delivery_date: str
-    delivery_time_slot: str
     receiver_name: str
-    receiver_phone: str
-    receiver_city: str
-    receiver_district: str
+    receiver_phone: Optional[str] = None
     receiver_address: str
-    card_note: str
+    card_note: Optional[str] = None
+    delivery_date: Optional[str] = "Hemen Teslim"
+    delivery_time_slot: Optional[str] = None
+    receiver_city: Optional[str] = None
+    receiver_district: Optional[str] = None
 
-class OrderOut(BaseModel):
+class OrderOut(OrderCreate):
+    id: int
     tracking_number: str
     status: str
-    product_name: str
-    delivery_date: str
-    receiver_name: str
-    
+    order_date: Optional[datetime] = None
+    product: Optional[ProductOut] = None
     class Config:
         from_attributes = True
 
-# --- REVIEW SCHEMAS ---
 class ReviewCreate(BaseModel):
-    comment: str
-    rating: int # 1-5 arası
-
-class ReviewOut(ReviewCreate):
-    id: int
-    user_id: int
     product_id: int
-    created_at: datetime # Tarih formatı
-    
+    rating: int
+    comment: str
+
+class ReviewOut(BaseModel):
+    id: int
+    rating: int
+    comment: str
+    created_at: Optional[datetime] = None
+    user: Optional[UserOut] = None
     class Config:
         from_attributes = True

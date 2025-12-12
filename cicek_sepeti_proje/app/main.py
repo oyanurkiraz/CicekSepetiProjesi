@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware # 👈 BU YENİ
 from . import models
 from .database import engine
-from .routers import auth, products, orders, reviews
+from .routers import auth, products, orders, reviews, favorites
 
 # Tabloları oluştur
 models.Base.metadata.create_all(bind=engine)
@@ -27,6 +27,7 @@ app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(orders.router)
 app.include_router(reviews.router)
+app.include_router(favorites.router)
 
 @app.get("/")
 def read_root():
