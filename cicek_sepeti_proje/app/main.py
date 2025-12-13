@@ -1,33 +1,36 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware # 👈 BU YENİ
+from fastapi.middleware.cors import CORSMiddleware 
 from . import models
 from .database import engine
-from .routers import auth, products, orders, reviews, favorites
+# 👇 VENDOR ROUTER'INI BURAYA EKLEDİK
+from .routers import auth, products, orders, reviews, favorites, vendor 
 
 # Tabloları oluştur
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Çiçek Sepeti FastAPI Projesi", version="1.0.0")
 
-# 👇 CORS AYARLARI (REACT İLE KONUŞMASI İÇİN ŞART)
+# CORS Middleware (React ile iletişim için gerekli)
 origins = [
-    "http://localhost:3000", # React'in adresi
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"], # GET, POST, PUT, DELETE hepsine izin ver
-    allow_headers=["*"],
+    allow_origins=origins, 
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"], 
 )
-# 👆 CORS BİTİŞ
 
 app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(orders.router)
 app.include_router(reviews.router)
 app.include_router(favorites.router)
+# 👇 KRİTİK EKSİK PARÇA: VENDOR ROUTER'I BURAYA EKLİYORUZ
+app.include_router(vendor.router) 
 
 @app.get("/")
 def read_root():

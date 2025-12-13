@@ -5,19 +5,18 @@ import { Gift, ArrowLeft } from 'lucide-react';
 const Login = () => {
   const navigate = useNavigate();
   
-  // Form verilerini tutacak değişkenler
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(""); // Önceki hataları temizle
+    setError("");
 
     try {
-      // 1. Backend'e İstek At (Dikkat: Backend form-data bekliyor!)
+      // 1. Backend'e Giriş İsteği
       const formData = new URLSearchParams();
-      formData.append('username', email); // Backend 'username' adıyla bekliyor
+      formData.append('username', email);
       formData.append('password', password);
 
       const response = await fetch("http://127.0.0.1:8000/login", {
@@ -28,22 +27,41 @@ const Login = () => {
         body: formData,
       });
 
-      // 2. Cevabı Kontrol Et
       if (!response.ok) {
         throw new Error("Giriş başarısız! E-posta veya şifre hatalı.");
       }
 
       const data = await response.json();
+      const token = data.access_token;
       
-      // 3. Token'ı Tarayıcı Hafızasına (LocalStorage) Kaydet
-      // Artık "data.access_token" bizim dijital kimliğimiz.
-      localStorage.setItem("token", data.access_token);
+      // Token'ı Kaydet
+      localStorage.setItem("token", token);
       
-      console.log("Giriş Başarılı! Token:", data.access_token);
+      // 2. KULLANICININ ROLÜNÜ ÇEK
+      const userRes = await fetch('http://127.0.0.1:8000/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!userRes.ok) {
+          throw new Error("Kullanıcı bilgileri alınamadı.");
+      }
+
+      const userData = await userRes.json();
       
-      // 4. Anasayfaya Yönlendir
-      alert("Giriş Başarılı! Yönlendiriliyorsunuz...");
-      window.location.href = "/";
+      // 👇 KRİTİK: ROLÜ LOCAL STORAGE'A KAYDET
+      localStorage.setItem("userRole", userData.role); 
+
+      // 3. YÖNLENDİRMEYİ YAPMADAN ÖNCE HEADER'I MANUEL GÜNCELLEMEYE ZORLA
+      window.dispatchEvent(new Event('storage')); 
+
+      // 4. YÖNLENDİRME
+      alert(`Giriş Başarılı! Hoş geldiniz ${userData.first_name || userData.email}`);
+      
+      if (userData.role === 'corporate') {
+          navigate('/vendor'); 
+      } else {
+          navigate('/');
+      }
 
     } catch (err: any) {
       setError(err.message);
@@ -54,10 +72,9 @@ const Login = () => {
     <div className="min-h-[80vh] flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-xl">
         
-        {/* Başlık ve Logo */}
         <div className="text-center">
           <div className="mx-auto h-12 w-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center">
-             <Gift size={24} />
+            <Gift size={24} />
           </div>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
             Tekrar Hoş Geldiniz
@@ -67,14 +84,12 @@ const Login = () => {
           </p>
         </div>
 
-        {/* Hata Mesajı Kutusu */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
             {error}
           </div>
         )}
 
-        {/* Form */}
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           <div className="rounded-md shadow-sm space-y-4">
             <div>

@@ -11,6 +11,7 @@ import ProductListing from './pages/ProductListing';
 import ProductDetail from './pages/ProductDetail';
 import OrderTracking from './pages/OrderTracking';
 import MyOrders from './pages/MyOrders'; // 👈 BU SATIR EKLENDİ
+import VendorDashboard from "./pages/VendorDashboard";
 
 
 const App = () => {
@@ -36,6 +37,7 @@ const App = () => {
           {/* 👇 İŞTE EKSİK OLAN ROTA BUYDU 👇 */}
           <Route path="/my-orders" element={<MyOrders />} />
           <Route path="/favorites" element={<Favorites />} />
+          <Route path="/vendor" element={<VendorDashboard />} />
           
         </Routes>
       </div>
