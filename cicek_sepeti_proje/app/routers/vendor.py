@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 from .. import models, schemas, database, oauth2
 
@@ -19,9 +19,10 @@ def get_incoming_orders(db: Session = Depends(get_db), current_user: models.User
     if current_user.role != "corporate":
         raise HTTPException(status_code=403, detail="Yetkisiz")
     
-    # Satıcının ürünlerine ait siparişler
+    # Satıcının ürünlerine ait siparişler - Product ilişkisini eager load et
     orders = db.query(models.Order)\
-               .join(models.Product)\
+               .options(joinedload(models.Order.product))\
+               .join(models.Product, models.Order.product_id == models.Product.id)\
                .filter(models.Product.seller_id == current_user.id)\
                .order_by(models.Order.id.desc())\
                .all()
