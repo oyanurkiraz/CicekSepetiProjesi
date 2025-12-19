@@ -2,11 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware 
 from . import models
 from .database import engine
-# 👇 VENDOR ROUTER'INI BURAYA EKLEDİK
-from .routers import auth, products, orders, reviews, favorites, vendor 
+from .routers import auth, products, orders, reviews, favorites, vendor, payment
 
 # Tabloları oluştur
 models.Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(title="Çiçek Sepeti FastAPI Projesi", version="1.0.0")
 
@@ -29,8 +29,8 @@ app.include_router(products.router)
 app.include_router(orders.router)
 app.include_router(reviews.router)
 app.include_router(favorites.router)
-# 👇 KRİTİK EKSİK PARÇA: VENDOR ROUTER'I BURAYA EKLİYORUZ
-app.include_router(vendor.router) 
+app.include_router(vendor.router)
+app.include_router(payment.router)
 
 @app.get("/")
 def read_root():

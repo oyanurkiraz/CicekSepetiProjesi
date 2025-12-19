@@ -1,59 +1,61 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, User, Gift, Clock, LogOut, Heart, Package, Store } from 'lucide-react';
+import { useCart } from '../context/CartContext';
 
 const Header = () => {
   const navigate = useNavigate();
+  const { getItemCount } = useCart();
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState<'individual' | 'corporate' | null>(null);
 
   // Rol bilgisini API'den çeker ve localStorage'a kaydeder (Bu kod Login.tsx tarafından da çağrılıyor)
   const fetchUserInfo = useCallback(async (token: string) => {
-      try {
-          const response = await fetch('http://127.0.0.1:8000/auth/me', {
-              headers: { Authorization: `Bearer ${token}` }
-          });
-          if (response.ok) {
-              const userData = await response.json();
-              localStorage.setItem("userRole", userData.role);
-              setUserRole(userData.role); 
-              return userData.role;
-          } else {
-              handleLogout(); 
-              return null;
-          }
-      } catch (error) {
-          console.error("Kullanıcı bilgisi çekilemedi", error);
-          return null;
+    try {
+      const response = await fetch('http://127.0.0.1:8000/auth/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const userData = await response.json();
+        localStorage.setItem("userRole", userData.role);
+        setUserRole(userData.role);
+        return userData.role;
+      } else {
+        handleLogout();
+        return null;
       }
+    } catch (error) {
+      console.error("Kullanıcı bilgisi çekilemedi", error);
+      return null;
+    }
   }, []);
 
   // Giriş durumunu ve rolü kontrol etme fonksiyonu
   const checkAuthStatus = useCallback(() => {
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("userRole") as 'individual' | 'corporate' | null;
-    
+
     setIsLoggedIn(!!token);
     setUserRole(role);
-    
+
     // Token var ama rol bilgisi kayıpsa HIZLICA çek. (Login sonrası ilk yükleme senaryosu)
     if (token && !role) {
-        fetchUserInfo(token);
+      fetchUserInfo(token);
     }
   }, [fetchUserInfo]);
 
   useEffect(() => {
     // Sayfa yüklendiğinde durumu kontrol et
     checkAuthStatus();
-    
+
     // localStorage'daki değişiklikleri dinle (Login.tsx'ten gelen event burada tetiklenir)
-    window.addEventListener('storage', checkAuthStatus); 
+    window.addEventListener('storage', checkAuthStatus);
 
     return () => {
-        window.removeEventListener('storage', checkAuthStatus);
+      window.removeEventListener('storage', checkAuthStatus);
     }
-  }, [checkAuthStatus]); 
+  }, [checkAuthStatus]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +66,7 @@ const Header = () => {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
-    localStorage.removeItem("userRole"); 
+    localStorage.removeItem("userRole");
     setIsLoggedIn(false);
     setUserRole(null);
     navigate("/login");
@@ -75,12 +77,14 @@ const Header = () => {
   const profilePath = isCorporate ? '/vendor' : '/my-account';
   const profileLabel = isCorporate ? '🏪 Mağazam' : '👤 Hesabım';
 
+  const cartItemCount = getItemCount();
+
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 h-20 flex items-center justify-between gap-4">
-        
+
         {/* Logo */}
-        <div 
+        <div
           className="flex items-center gap-2 cursor-pointer flex-shrink-0"
           onClick={() => navigate('/')}
         >
@@ -92,9 +96,9 @@ const Header = () => {
 
         {/* Arama Çubuğu */}
         <form onSubmit={handleSearch} className="flex-1 max-w-2xl hidden md:flex relative group">
-          <input 
-            type="text" 
-            placeholder="Çiçek, hediye veya kategori ara..." 
+          <input
+            type="text"
+            placeholder="Çiçek, hediye veya kategori ara..."
             className="w-full h-12 pl-5 pr-14 rounded-full border-2 border-gray-100 bg-gray-50 focus:bg-white focus:border-rose-500 focus:outline-none transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -106,9 +110,9 @@ const Header = () => {
 
         {/* Sağ Menü */}
         <div className="flex items-center gap-3 lg:gap-6 flex-shrink-0">
-          
-          <button 
-            onClick={() => navigate('/track')} 
+
+          <button
+            onClick={() => navigate('/track')}
             className="hidden lg:flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-rose-600 transition-colors"
           >
             <Clock size={20} />
@@ -123,71 +127,76 @@ const Header = () => {
               </div>
               <span className="hidden sm:inline">{isLoggedIn ? profileLabel : "Giriş Yap"}</span>
             </button>
-            
+
             {/* Dropdown Menü */}
             <div className="absolute right-0 top-[90%] w-56 bg-white shadow-xl rounded-2xl border border-gray-100 hidden group-hover:block z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
-               <div className="p-2 flex flex-col gap-1">
-                 
-                 {isLoggedIn ? (
-                    <>
-                       {/* MAĞAZAM / HESABIM BUTONU */}
-                       <button 
-                          onClick={() => navigate(profilePath)}
-                          className="text-left px-4 py-3 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-medium flex items-center gap-3 transition-colors"
-                       >
-                          {isCorporate ? <Store size={18}/> : <User size={18}/>} {profileLabel}
-                       </button>
+              <div className="p-2 flex flex-col gap-1">
 
-                       {/* SİPARİŞLERİM BUTONU - Sadece Bireysel Görür */}
-                       {!isCorporate && (
-                            <button 
-                                onClick={() => navigate('/my-orders')}
-                                className="text-left px-4 py-3 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-medium flex items-center gap-3 transition-colors"
-                            >
-                                <Package size={18}/> Siparişlerim
-                            </button>
-                        )}
-                        
-                       {/* FAVORİLERİM BUTONU - Sadece Bireysel Görür */}
-                       {!isCorporate && (
-                            <button 
-                                onClick={() => navigate('/favorites')}
-                                className="text-left px-4 py-3 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-medium flex items-center gap-3 transition-colors"
-                            >
-                                <Heart size={18}/> Favorilerim
-                            </button>
-                        )}
-                        
-                       <hr className="my-1 border-gray-100"/>
-                       
-                       <button 
-                          onClick={handleLogout}
-                          className="text-left px-4 py-3 hover:bg-red-50 text-red-600 rounded-xl text-sm font-medium flex items-center gap-3 transition-colors"
-                       >
-                         <LogOut size={18}/> Çıkış Yap
-                       </button>
-                    </>
-                 ) : (
-                    <>
-                       <button onClick={() => navigate('/login')} className="text-left px-4 py-3 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-medium">Giriş Yap</button>
-                       <button onClick={() => navigate('/register')} className="text-left px-4 py-3 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-medium">Üye Ol</button>
-                    </>
-                 )}
-               </div>
+                {isLoggedIn ? (
+                  <>
+                    {/* MAĞAZAM / HESABIM BUTONU */}
+                    <button
+                      onClick={() => navigate(profilePath)}
+                      className="text-left px-4 py-3 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-medium flex items-center gap-3 transition-colors"
+                    >
+                      {isCorporate ? <Store size={18} /> : <User size={18} />} {profileLabel}
+                    </button>
+
+                    {/* SİPARİŞLERİM BUTONU - Sadece Bireysel Görür */}
+                    {!isCorporate && (
+                      <button
+                        onClick={() => navigate('/my-orders')}
+                        className="text-left px-4 py-3 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-medium flex items-center gap-3 transition-colors"
+                      >
+                        <Package size={18} /> Siparişlerim
+                      </button>
+                    )}
+
+                    {/* FAVORİLERİM BUTONU - Sadece Bireysel Görür */}
+                    {!isCorporate && (
+                      <button
+                        onClick={() => navigate('/favorites')}
+                        className="text-left px-4 py-3 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-medium flex items-center gap-3 transition-colors"
+                      >
+                        <Heart size={18} /> Favorilerim
+                      </button>
+                    )}
+
+                    <hr className="my-1 border-gray-100" />
+
+                    <button
+                      onClick={handleLogout}
+                      className="text-left px-4 py-3 hover:bg-red-50 text-red-600 rounded-xl text-sm font-medium flex items-center gap-3 transition-colors"
+                    >
+                      <LogOut size={18} /> Çıkış Yap
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => navigate('/login')} className="text-left px-4 py-3 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-medium">Giriş Yap</button>
+                    <button onClick={() => navigate('/register')} className="text-left px-4 py-3 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-medium">Üye Ol</button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Sepet Butonu - Sadece Bireysel Görür */}
           {!isCorporate && (
-              <button 
-                onClick={() => navigate('/cart')} 
-                className="flex items-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-full hover:bg-green-700 transition-all shadow-lg shadow-green-200 hover:-translate-y-0.5"
-              >
-                <ShoppingCart size={20} />
-                <span className="font-bold hidden sm:inline">Sepetim</span>
-              </button>
+            <button
+              onClick={() => navigate('/cart')}
+              className="flex items-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-full hover:bg-green-700 transition-all shadow-lg shadow-green-200 hover:-translate-y-0.5 relative"
+            >
+              <ShoppingCart size={20} />
+              <span className="font-bold hidden sm:inline">Sepetim</span>
+              {cartItemCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-rose-600 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {cartItemCount > 9 ? '9+' : cartItemCount}
+                </span>
+              )}
+            </button>
           )}
-          
+
         </div>
       </div>
     </header>
