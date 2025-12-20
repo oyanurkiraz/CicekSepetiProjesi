@@ -1,62 +1,47 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from .. import models, schemas, database, oauth2  # 👈 OAUTH2 BURAYA EKLENDİ!
+from .. import models, schemas, database, oauth2
+from ..services.product_service import ProductService
 
 router = APIRouter(
     prefix="/products",
     tags=["Products"]
 )
 
-get_db = database.get_db
 
-# GELİŞMİŞ ARAMA (Şehir, İlçe, Kategori, İsim)
 @router.get("/", response_model=List[schemas.ProductOut])
 def get_products(
-    db: Session = Depends(get_db),
+    db: Session = Depends(database.get_db),
     search: Optional[str] = "",
     category: Optional[str] = None,
-    city: Optional[str] = None,      # Şehir Filtresi
-    district: Optional[str] = None   # İlçe Filtresi
+    city: Optional[str] = None,
+    district: Optional[str] = None
 ):
-    # Ürünleri ve Satıcılarını birleştirerek sorgula
-    query = db.query(models.Product).join(models.User).filter(models.Product.is_active == True)
-    
-    # 1. Kategori Filtresi
-    if category:
-        query = query.filter(models.Product.category == category)
+    """Ürün listesi (filtreleme destekli)"""
+    return ProductService.get_products(
+        db=db,
+        search=search,
+        category=category,
+        city=city,
+        district=district
+    )
 
-    # 2. Şehir ve İlçe Filtresi
-    if city:
-        query = query.filter(models.User.city == city)
-    if district:
-        query = query.filter(models.User.district == district)
 
-    # 3. İsim Arama
-    if search:
-        query = query.filter(models.Product.name.ilike(f"%{search}%"))
-    
-    return query.all()
-
-# TEK BİR ÜRÜN GETİR
 @router.get("/{id}", response_model=schemas.ProductOut)
-def get_product(id: int, db: Session = Depends(get_db)):
-    product = db.query(models.Product).filter(models.Product.id == id).first()
+def get_product(id: int, db: Session = Depends(database.get_db)):
+    """Tek bir ürün getir"""
+    product = ProductService.get_product_by_id(db, product_id=id)
     if not product:
         raise HTTPException(status_code=404, detail="Ürün bulunamadı")
     return product
 
-# YENİ ÜRÜN EKLE
+
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.ProductOut)
 def create_product(
     product: schemas.ProductCreate, 
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(oauth2.get_current_user) # Artık hata vermeyecek
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(oauth2.get_current_user)
 ):
-    # Ürünü ekleyen kişi satıcıdır
-    new_product = models.Product(**product.dict(), seller_id=current_user.id)
-    
-    db.add(new_product)
-    db.commit()
-    db.refresh(new_product)
-    return new_product
+    """Yeni ürün ekle"""
+    return ProductService.create_product(db=db, product=product, seller_id=current_user.id)

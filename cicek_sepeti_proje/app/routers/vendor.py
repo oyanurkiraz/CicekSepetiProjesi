@@ -1,66 +1,123 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from typing import List
 from .. import models, schemas, database, oauth2
+from ..services.vendor_service import VendorService
+from ..services.product_service import ProductService
+from ..services.order_service import OrderService
+from ..decorators import require_vendor
 
 router = APIRouter(prefix="/vendor", tags=["Vendor"])
-get_db = database.get_db
 
-# 1. ÇİÇEKÇİNİN ÜRÜNLERİ
-@router.get("/products", response_model=List[schemas.ProductOut])
-def get_my_products(db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
-    if current_user.role != "corporate":
-        raise HTTPException(status_code=403, detail="Yetkisiz")
-    return db.query(models.Product).filter(models.Product.seller_id == current_user.id).all()
 
-# 2. GELEN SİPARİŞLER
-@router.get("/orders", response_model=List[schemas.OrderOut])
-def get_incoming_orders(db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
-    if current_user.role != "corporate":
-        raise HTTPException(status_code=403, detail="Yetkisiz")
+# ============================================
+# VENDOR DEPENDENCY WRAPPER
+# ============================================
+
+def get_current_vendor(
+    current_user: models.User = Depends(oauth2.get_current_user)
+) -> models.User:
+    """
+    Mevcut kullanıcının satıcı olduğunu doğrulayan dependency wrapper.
     
-    # Satıcının ürünlerine ait siparişler - Product ilişkisini eager load et
-    orders = db.query(models.Order)\
-               .options(joinedload(models.Order.product))\
-               .join(models.Product, models.Order.product_id == models.Product.id)\
-               .filter(models.Product.seller_id == current_user.id)\
-               .order_by(models.Order.id.desc())\
-               .all()
-    return orders
+    Bu fonksiyon, oauth2.get_current_user ve require_vendor decorator'ünü
+    birleştirerek tek bir dependency olarak kullanılmasını sağlar.
+    
+    Kullanım:
+        @router.get("/vendor-endpoint")
+        def endpoint(current_user: models.User = Depends(get_current_vendor)):
+            ...
+    """
+    return require_vendor(current_user)
 
-# 3. DURUM GÜNCELLEME
+
+# ============================================
+# VENDOR ENDPOINTS
+# ============================================
+
+@router.get("/products", response_model=List[schemas.ProductOut])
+def get_my_products(
+    db: Session = Depends(database.get_db), 
+    current_user: models.User = Depends(get_current_vendor)
+):
+    """
+    Çiçekçinin ürünleri.
+    
+    Not: get_current_vendor dependency'si üzerinden require_vendor 
+    decorator kontrolü otomatik olarak yapılır.
+    """
+    return VendorService.get_vendor_products(db=db, vendor_id=current_user.id)
+
+
+@router.get("/orders", response_model=List[schemas.OrderOut])
+def get_incoming_orders(
+    db: Session = Depends(database.get_db), 
+    current_user: models.User = Depends(get_current_vendor)
+):
+    """
+    Gelen siparişler.
+    
+    Not: get_current_vendor dependency'si üzerinden require_vendor 
+    decorator kontrolü otomatik olarak yapılır.
+    """
+    return VendorService.get_vendor_orders(db=db, vendor_id=current_user.id)
+
+
 @router.put("/orders/{id}/status")
-def update_order_status(id: int, status_text: str, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
-    order = db.query(models.Order).join(models.Product).filter(
-        models.Order.id == id,
-        models.Product.seller_id == current_user.id
-    ).first()
-
+def update_order_status(
+    id: int, 
+    status_text: str, 
+    db: Session = Depends(database.get_db), 
+    current_user: models.User = Depends(get_current_vendor)
+):
+    """
+    Sipariş durumu güncelle.
+    
+    Not: get_current_vendor dependency'si üzerinden require_vendor 
+    decorator kontrolü otomatik olarak yapılır.
+    """
+    order = OrderService.update_order_status(
+        db=db, order_id=id, seller_id=current_user.id, new_status=status_text
+    )
     if not order:
         raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
-    
-    order.status = status_text
-    db.commit()
     return {"message": "Durum güncellendi", "status": status_text}
 
-# 4. ÜRÜN SİL
+
 @router.delete("/products/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_product(id: int, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
-    product = db.query(models.Product).filter(models.Product.id == id).first()
-    if not product or product.seller_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+def delete_product(
+    id: int, 
+    db: Session = Depends(database.get_db), 
+    current_user: models.User = Depends(get_current_vendor)
+):
+    """
+    Ürün sil.
     
-    db.delete(product)
-    db.commit()
+    Not: get_current_vendor dependency'si üzerinden require_vendor 
+    decorator kontrolü otomatik olarak yapılır.
+    """
+    success = ProductService.delete_product(db=db, product_id=id, seller_id=current_user.id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
     return
 
-# 5. FİYAT GÜNCELLE
+
 @router.put("/products/{id}/price")
-def update_product_price(id: int, price: float, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
-    product = db.query(models.Product).filter(models.Product.id == id).first()
-    if not product or product.seller_id != current_user.id:
+def update_product_price(
+    id: int, 
+    price: float, 
+    db: Session = Depends(database.get_db), 
+    current_user: models.User = Depends(get_current_vendor)
+):
+    """
+    Ürün fiyatı güncelle.
+    
+    Not: get_current_vendor dependency'si üzerinden require_vendor 
+    decorator kontrolü otomatik olarak yapılır.
+    """
+    product = ProductService.update_product_price(
+        db=db, product_id=id, seller_id=current_user.id, new_price=price
+    )
+    if not product:
         raise HTTPException(status_code=404, detail="Ürün bulunamadı")
-        
-    product.price = price
-    db.commit()
     return {"message": "Fiyat güncellendi"}
